@@ -2,7 +2,7 @@ import 'p5';
 
 function sketch(s) {
 
-  const GAME = { width: 500, height: 400, gameOver: true }
+  const GAME = { width: 500, height: 400, gameOver: false, win: false }
   GAME.halfWidth = GAME.width / 2
   GAME.halfHeight = GAME.height / 2
 
@@ -10,20 +10,27 @@ function sketch(s) {
   let heroImage;
   let hitSound;
   let backgroundSound;
-  let points = 500;
+  let backgroundSound2;
+  let whooshSound;
+  let hornSound;
+  let hornSound2;
+  let gameOverSound;
+  let coinSound;
+  let winGameSound;
   let timer = 20;
+  let timeout = null
   
-  const hero = { x: 100, y: 366, yA: 366, yB: 0, width: 30, height: 30 }
+  const hero = { x: 100, y: 366, yA: 366, yB: 5, width: 30, height: 30, hitted: false, keys: 0, maxKeys: 1 }
   const key = { x: 100, y: 4, width: 28, height: 28, yA: 4, yB: 366, inverse: false, image: null, imagePath: 'assets/key.png'}
-
+  
   const initialXCar = GAME.width + 100;
   const cars = [
-    { x: initialXCar, y: 40, width: 50, height: 40, speed: 2, image: null, imagePath: 'assets/carro-1.png' },
-    { x: initialXCar, y: 96, width: 50, height: 40, speed: 2.5, image: null, imagePath: 'assets/carro-2.png' },
-    { x: initialXCar, y: 150, width: 50, height: 40, speed: 3.2, image: null, imagePath: 'assets/carro-3.png' },
-    { x: initialXCar, y: 210, width: 50, height: 40, speed: 5, image: null, imagePath: 'assets/carro-2.png' },
-    { x: initialXCar, y: 266, width: 50, height: 40, speed: 3.3, image: null, imagePath: 'assets/carro-3.png' },
-    { x: initialXCar, y: 318, width: 50, height: 40, speed: 2.2, image: null, imagePath: 'assets/carro-1.png' },
+    { x: initialXCar, y: 40,  width: 50, height: 40, speed: 2,    image: null, imagePath: 'assets/carro-1.png', horn: 1 },
+    { x: initialXCar, y: 96,  width: 50, height: 40, speed: 2.5,  image: null, imagePath: 'assets/carro-2.png', horn: 2 },
+    { x: initialXCar, y: 150, width: 50, height: 40, speed: 3.2,  image: null, imagePath: 'assets/carro-3.png', horn: 1 },
+    { x: initialXCar, y: 210, width: 50, height: 40, speed: 5,    image: null, imagePath: 'assets/carro-2.png', horn: 2 },
+    { x: initialXCar, y: 266, width: 50, height: 40, speed: 3.3,  image: null, imagePath: 'assets/carro-3.png', horn: 1 },
+    { x: initialXCar, y: 318, width: 50, height: 40, speed: 2.2,  image: null, imagePath: 'assets/carro-1.png', horn: 2 },
   ]
 
   s.preload = () => {
@@ -31,7 +38,14 @@ function sketch(s) {
     heroImage = s.loadImage('assets/ator-1.png')
     key.image = s.loadImage(key.imagePath)
     hitSound = s.loadSound('assets/sons/colidiu.mp3')
-    backgroundSound = s.loadSound('assets/sons/trilha.mp3')
+    backgroundSound = s.loadSound('assets/sons/mixkit-game-level-music.wav')
+    backgroundSound2 = s.loadSound('assets/sons/mixkit-urban-city-sounds-and-light-car-traffic.wav')
+    whooshSound = s.loadSound('assets/sons/mixkit-air-woosh.wav')
+    hornSound = s.loadSound('assets/sons/mixkit-car-horn.wav')
+    hornSound2 = s.loadSound('assets/sons/mixkit-small-car-horn.wav')
+    gameOverSound = s.loadSound('assets/sons/mixkit-player-losing-or-failing.wav')
+    winGameSound = s.loadSound('assets/sons/mixkit-fantasy-game-success-notification.wav')
+    coinSound = s.loadSound('assets/sons/mixkit-arcade-game-jump-coin.wav')
     
     for (const car of cars) {
       car.image = s.loadImage(car.imagePath)
@@ -41,28 +55,56 @@ function sketch(s) {
   s.setup = () => {
     const canvas = s.createCanvas(GAME.width, GAME.height)
     canvas.parent('sketch-canvas')
+
+    streetImage.loadPixels()
+    
+    backgroundSound.loop()
+    backgroundSound.setVolume(0.1)
+    backgroundSound2.loop()
+    backgroundSound2.setVolume(0.2)
   }
   
   s.draw = () => {
     if(streetImage) {
       s.background(streetImage)
-      s.image(heroImage, hero.x, hero.y, hero.width, hero.height)
-      s.image(key.image, key.x, key.y, key.width, key.height)
-      showCars()
-      showPoints()
-      showTimer()
       
-      if (GAME.gameOver === false) {
+      s.image(key.image, key.x, key.y, key.width, key.height)
+
+      showHero()
+      showCars()
+      showTimer()
+      showDisclaimer()
+      
+      if (GAME.gameOver === false && GAME.win === false) {
         moveCars()
         moveHero()
         collisionCarHero()
         collisionHeroKey()
         calcTimer()
-      } else {
+      }
+
+      if (GAME.gameOver) {
         showGameOver()
-        setTimeout(() => resetGame(), 1000);
+        if (!timeout) {
+          setTimeout(() => resetGame(), 2000);
+          timeout = true
+        }
       }
       
+      if(GAME.win === true) {
+        showWinScreen()
+        if (!timeout) {
+          setTimeout(() => resetGame(), 2000);
+          timeout = true
+        }
+      }
+    }
+  }
+
+  function showHero() {
+    // Make hero show/hide animation
+    if(hero.hitted === false || s.frameCount % 4 !== 0) {
+      hero.image = s.image(heroImage, hero.x, hero.y, hero.width, hero.height)
     }
   }
 
@@ -72,24 +114,34 @@ function sketch(s) {
     }
   }
 
-  function showPoints() {
-    s.textSize(25)
-    s.fill('gold')
-    s.text(points, 10, 27)
+  function showDisclaimer() {
+    s.textSize(15)
+    s.fill('blue')
+    s.text(`${hero.maxKeys - hero.keys} Chaves perdidas`, GAME.width - 190, GAME.height - 12)
   }
 
   function showTimer() {
     s.textSize(25)
     s.fill('red')
-    s.text(timer, GAME.width - 50, GAME.height - 10)
+    s.text('0:' + timer, GAME.width - 55, GAME.height - 10)
   }
 
   function showGameOver() {
     s.background('pink')
     s.fill('black')
     s.textSize(30)
-    s.text('Total de pontos: ' + points, 80, 180)
+    s.text('Game Over', 130, 180)
     s.image(heroImage, 200, 200, hero.width, hero.height)
+  }
+
+  function showWinScreen(){
+    s.background('pink')
+    s.fill('black')
+    s.textSize(30)
+    s.text('Parabéns!', 150, 180)
+    s.textSize(20)
+    s.text(`${hero.keys} Chaves coletadas.`, 130, 215)
+    s.image(heroImage, 200, 240, hero.width, hero.height)
   }
 
   function moveCars() {
@@ -103,17 +155,42 @@ function sketch(s) {
   }
 
   function collisionCarHero() {
-    let hit = false;
     for(let car of cars) {
-      hit = s.collideRectCircle(car.x,car.y,car.width,car.height,hero.x,hero.y,hero.width/2)
+      hitHeroCar(car)
+      whooshHornSounds(car)
+    }
+  }
 
-      if(hit) {
-        hitSound.play()
-        hero.y = key.inverse ? hero.yB : hero.yA;
-        points -= 50;
-        points = points < 0 ? 0 : points;
+  function hitHeroCar(car) {
+    let hit = s.collideRectCircle(car.x,car.y,car.width,car.height,hero.x,hero.y,hero.width/2)
+
+    if(hit && hero.hitted === false) {
+      hitSound.play()
+      hero.hitted = true;
+
+      setTimeout(() => {
+        hero.hitted = false;
+        backHeroToInitial()
+      }, 2000);
+    }
+  }
+
+  function whooshHornSounds(car) {
+    let hit = s.collideRectRect(car.x, car.y, car.width, car.height, hero.x - 10, hero.y - 10, hero.width + 10, hero.height + 10)
+    if(hit && hero.hitted === false && whooshSound.isPlaying() === false) {
+      whooshSound.play();
+
+      if(hero.y < 366 - hero.height && hero.y > hero.height + 10 ) {
+        const horn = car.horn === 1 ? hornSound : hornSound2;
+        
+        horn.play();
+        horn.setVolume(0.5)
       }
     }
+  }
+
+  function backHeroToInitial() {
+    hero.y = key.inverse ? hero.yB : hero.yA;
   }
 
   function collisionHeroKey() {
@@ -121,14 +198,31 @@ function sketch(s) {
     hit = s.collideRectCircle(key.x, key.y, key.width, key.height, hero.x, hero.y, hero.width/2)
 
     if(hit) {
-      hitSound.play()
+      coinSound.play()
       key.y = key.inverse ? key.yA : key.yB;
       key.inverse = !key.inverse;
-      points += 100;
+      hero.keys += 1;
+      
+      if(hero.keys === hero.maxKeys) {
+        winWave()
+        backHeroToInitial()
+      }
     }
   }
 
+  function winWave() {
+    GAME.win = true;
+    hero.maxKeys = hero.maxKeys < 5 ? hero.maxKeys + 1 : hero.maxKeys;
+    backgroundSound.pause()
+    backgroundSound2.pause()
+    winGameSound.play()
+  }
+
   function moveHero() {
+    if (hero.hitted) {
+      return
+    }
+
     if (s.keyIsDown(s.UP_ARROW)) {
       if (collisionHeroBorder(hero.y - 3) === false) {
         hero.y -= 3;
@@ -150,14 +244,28 @@ function sketch(s) {
     if (s.frameCount % 60 === 0 && timer > 0) {
       timer -= 1;
     } else if (timer === 0){
-      GAME.gameOver = true;
+      setGameOver()
     }
+  }
+
+  function setGameOver() {
+    GAME.gameOver = true;
+    hero.maxKeys = 1;
+    backgroundSound.pause()
+    backgroundSound2.pause()
+    gameOverSound.play()
   }
 
   function resetGame() {
     GAME.gameOver = false
+    GAME.win = false
     timer = 20
-    points = 0
+    hero.keys = 0
+    hero.hitted = false
+    backgroundSound.play()
+    backgroundSound2.play()
+    backHeroToInitial()
+    timeout = null
   }
 }
 
